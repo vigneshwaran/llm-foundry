@@ -23,6 +23,7 @@ from llmfoundry.utils.builders import (build_icl_evaluators, build_logger,
                                        build_tokenizer)
 from llmfoundry.utils.config_utils import process_init_device
 
+import logging
 
 def load_model(model_cfg: DictConfig, tokenizer: PreTrainedTokenizerBase,
                fsdp_config: Optional[Dict],
@@ -67,6 +68,7 @@ def evaluate_model(model_cfg: DictConfig, cfg: DictConfig, run_name: str,
             e.label: e.dataloader.num_samples for e in evaluators
         }
         model_gauntlet_callback = ModelGauntlet(**model_gauntlet)
+
     else:
         model_gauntlet = None
         model_gauntlet_callback = None
@@ -83,7 +85,6 @@ def evaluate_model(model_cfg: DictConfig, cfg: DictConfig, run_name: str,
         model_gauntlet_df = pd.DataFrame(
             columns=['model_name', 'average'] +
             [t.name for t in model_gauntlet.categories])
-
     in_memory_logger = InMemoryLogger()  # track metrics in the in_memory_logger
     loggers: List[LoggerDestination] = [
         build_logger(name, logger_cfg)
@@ -124,6 +125,13 @@ def main(cfg: DictConfig):
     if cfg.get('run_name') is None:
         cfg.run_name = os.environ.get('RUN_NAME', 'llm')
 
+    if cfg.get("result_dir") is None:
+        import time
+        cfg.result_dir = str(int(time.time()))
+
+    os.makedirs(cfg.result_dir, exist_ok=True)
+    logging.info(f"{cfg.result_dir}")
+
     reproducibility.seed_all(cfg.seed)
     dist.initialize_dist(get_device(None), timeout=cfg.dist_timeout)
 
@@ -150,6 +158,7 @@ def main(cfg: DictConfig):
                                                    in_memory_logger.data,
                                                    benchmark_to_taxonomy,
                                                    model_cfg.model_name)
+        model_results.to_json(f"{cfg.result_dir}/{model_cfg.model_name.split('/')[-1]}.json", orient='records')
 
         if models_df is None:
             models_df = model_results
@@ -166,8 +175,10 @@ def main(cfg: DictConfig):
             row.update({
                 'average': composite_scores[f'metrics/model_gauntlet/average']
             })
+            cur_df = pd.DataFrame([row])
+            cur_df.to_json(f"{cfg.result_dir}/gauntlet-{model_cfg.model_name.split('/')[-1]}.json", orient='records', indent=2)
             model_gauntlet_df = pd.concat(
-                [model_gauntlet_df, pd.DataFrame([row])], ignore_index=True)
+                [model_gauntlet_df, cur_df], ignore_index=True)
 
             print(f'Printing gauntlet results for all models')
             print(
@@ -175,6 +186,7 @@ def main(cfg: DictConfig):
                     'average', ascending=False).to_markdown(index=False))
         print(f'Printing complete results for all models')
         print(models_df.to_markdown(index=False))
+    models_df.to_json(f"{cfg.result_dir}/all_models.json", orient='records', indent=2)
 
 
 def calculate_markdown_results(logger_keys: List[str], logger_data: Dict,
