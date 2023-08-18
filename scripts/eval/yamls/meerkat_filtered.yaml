@@ -1,0 +1,57 @@
+max_seq_len: 2048
+seed: 1
+precision: amp_fp16
+result_dir: results
+
+# If you are using one model, put it here:
+model_3: /chinchilla/meerkat-m2-13k
+model_2: /chinchilla/meerkat-m2-25k
+model_1: /chinchilla/meerkat-m2-50k
+# otherwise, write a block for each model you want to test in the `models` section
+
+models:
+-
+  model_name: ${model_1}
+  model:
+    name: hf_causal_lm
+    pretrained_model_name_or_path: ${model_1}
+    init_device: cpu
+    pretrained: true
+  tokenizer:
+    name: ${model_1}
+    kwargs:
+      model_max_length: ${max_seq_len}
+# # if you are evaluating more than one model, list them all as YAML blocks without variable interpolation
+-
+  model_name: ${model_2}
+  model:
+    name: hf_causal_lm
+    pretrained_model_name_or_path: ${model_2}
+    init_device: cpu
+    pretrained: true
+  tokenizer:
+    name: ${model_2}
+    kwargs:
+      model_max_length: ${max_seq_len}
+-
+  model_name: ${model_3}
+  model:
+    name: hf_causal_lm
+    pretrained_model_name_or_path: ${model_3}
+    init_device: cpu
+    pretrained: true
+  tokenizer:
+    name: ${model_3}
+    kwargs:
+      model_max_length: ${max_seq_len}
+
+
+device_eval_batch_size: 16
+
+# FSDP config for model sharding
+fsdp_config:
+  sharding_strategy: FULL_SHARD
+  mixed_precision: FULL
+
+model_gauntlet: 'eval/yamls/gauntlet_filtered.yaml'
+icl_tasks: 'eval/yamls/tasks_filtered.yaml'
