@@ -158,7 +158,7 @@ def main(cfg: DictConfig):
                                                    in_memory_logger.data,
                                                    benchmark_to_taxonomy,
                                                    model_cfg.model_name)
-        model_results.to_json(f"{cfg.result_dir}/{model_cfg.model_name.split('/')[-1]}.json", orient='records')
+        model_results.to_json(f"{cfg.result_dir}/{model_cfg.model_name.split('/')[-1]}.json", orient='records', indent=2)
 
         if models_df is None:
             models_df = model_results
@@ -184,8 +184,8 @@ def main(cfg: DictConfig):
             print(
                 model_gauntlet_df.sort_values(
                     'average', ascending=False).to_markdown(index=False))
-        print(f'Printing complete results for all models')
-        print(models_df.to_markdown(index=False))
+    print(f'Printing complete results for all models')
+    print(models_df.to_markdown(index=False))
     models_df.to_json(f"{cfg.result_dir}/all_models.json", orient='records', indent=2)
 
 
